@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Attendance</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .form-box {
+            width: 40%;
+        }
+
+        .table-box {
+            width: 60%;
+            height: 500px;
+            overflow-y: auto; /* ✅ scroll inside box */
+        }
+
+        h2, h3 {
+            text-align: center;
+        }
+
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr;  /* ✅ single column */
+    gap: 10px;
+}
+
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        select, input {
+            padding: 6px;
+        }
+
+        button {
+            grid-column: span 1;
+            padding: 10px;
+            background: #4facfe;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px;
+            text-align: center;
+        }
+
+        th {
+            background: #4facfe;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="main-container">
+
+    <!-- ✅ LEFT SIDE FORM -->
+    <div class="box form-box">
+
+        <h2>Attendance Form</h2>
+
+        {% if request.args.get('success') %}
+        <p style="color:green; text-align:center;">✅ Submitted Successfully</p>
+        {% endif %}
+
+        <form action="/submit" method="POST">
+
+            <div class="form-grid">
+
+                <div class="form-group">
+                    <label>Shift Date</label>
+                    <input type="date" name="shift_date" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Country</label>
+                    <select name="country" required>
+                        <option value="">Select</option>
+                        {% for c in countries %}
+                        <option value="{{ c }}">{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Location</label>
+                    <select name="location" required>
+                        <option value="">Select</option>
+                        {% for l in locations %}
+                        <option value="{{ l }}">{{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Employee Name</label>
+                    <select name="name" required>
+                        <option value="">Select</option>
+                        {% for e in employees %}
+                        <option value="{{ e }}">{{ e }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Support Type</label>
+                    <select name="support_type" required>
+                        <option value="">Select</option>
+                        {% for s in support_types %}
+                        <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>In Time</label>
+                    <input type="time" name="in_time" required>
+                </div>
+
+                <button type="submit">Submit</button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+    <!-- ✅ RIGHT SIDE PENDING TABLE -->
+    <div class="box table-box">
+
+        <h3>Pending Out Time</h3>
+
+        {% if pending %}
+        <table>
+            <tr>
+                <th>Name</th>
+                <th>Date</th>
+                <th>In Time</th>
+                <th>Out Time</th>
+                <th>Action</th>
+            </tr>
+
+            {% for row in pending %}
+            <tr>
+                <form action="/update_out_time" method="POST">
+
+                    <td>{{ row["Employee Name"] }}</td>
+                    <td>{{ row["Shift Date"] }}</td>
+                    <td>{{ row["In Time"] }}</td>
+
+                    <td>
+                        <input type="time" name="out_time" required>
+                    </td>
+
+                    <td>
+                        <input type="hidden" name="name" value="{{ row['Employee Name'] }}">
+                        <input type="hidden" name="shift_date" value="{{ row['Shift Date'] }}">
+                        <button type="submit">Update</button>
+                    </td>
+
+                </form>
+            </tr>
+            {% endfor %}
+
+        </table>
+        {% else %}
+        <p>No pending records ✅</p>
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

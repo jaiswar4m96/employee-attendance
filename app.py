@@ -1,10 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for
+import sqlite3
 import pandas as pd
 import os
 
 app = Flask(__name__)
 
-file_path = "attendance.xlsx"
+db_path = "attendance.db"
 master_file = "master_data.xlsx"
 
 
@@ -17,14 +18,27 @@ def form():
     employees = df_master["Employee Name"].dropna().unique()
     support_types = df_master["Support Type"].dropna().unique()
 
-    # ✅ Pending records (Out Time blank)
-    if os.path.exists(file_path):
-        df_att = pd.read_excel(file_path)
-        pending = df_att[
-            (df_att["Out Time"].isna()) | (df_att["Out Time"] == "")
-        ]
-    else:
-        pending = pd.DataFrame()
+    # ✅ Get pending data from database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT employee_name, shift_date, in_time 
+        FROM attendance
+        WHERE out_time IS NULL OR out_time = ''
+    """)
+
+    rows = cursor.fetchall()
+
+    pending = []
+    for row in rows:
+        pending.append({
+            "Employee Name": row[0],
+            "Shift Date": row[1],
+            "In Time": row[2]
+        })
+
+    conn.close()
 
     return render_template(
         'form.html',
@@ -32,7 +46,7 @@ def form():
         locations=locations,
         employees=employees,
         support_types=support_types,
-        pending=pending.to_dict(orient='records')
+        pending=pending
     )
 
 
@@ -45,37 +59,34 @@ def submit():
     shift_date = request.form['shift_date']
     in_time = request.form['in_time']
 
-    if os.path.exists(file_path):
-        df = pd.read_excel(file_path, dtype=str)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # ✅ Check existing record
+    cursor.execute("""
+        SELECT id FROM attendance
+        WHERE employee_name=? AND shift_date=? AND (out_time IS NULL OR out_time='')
+    """, (name, shift_date))
+
+    match = cursor.fetchone()
+
+    if match:
+        # ✅ Update Out Time
+        cursor.execute("""
+            UPDATE attendance
+            SET out_time=?
+            WHERE id=?
+        """, (in_time, match[0]))
     else:
-        df = pd.DataFrame(columns=[
-            "Shift Date", "Country", "Location",
-            "Employee Name", "Support Type",
-            "In Time", "Out Time"
-        ])
+        # ✅ Insert new record
+        cursor.execute("""
+            INSERT INTO attendance
+            (shift_date, country, location, employee_name, support_type, in_time, out_time)
+            VALUES (?, ?, ?, ?, ?, ?, '')
+        """, (shift_date, country, location, name, support_type, in_time))
 
-    match = df[
-        (df["Employee Name"] == name) &
-        (df["Shift Date"] == shift_date) &
-        ((df["Out Time"].isna()) | (df["Out Time"] == ""))
-    ]
-
-    if not match.empty:
-        index = match.index[0]
-        df.at[index, "Out Time"] = in_time
-    else:
-        new_data = {
-            "Shift Date": shift_date,
-            "Country": country,
-            "Location": location,
-            "Employee Name": name,
-            "Support Type": support_type,
-            "In Time": in_time,
-            "Out Time": ""
-        }
-        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
-
-    df.to_excel(file_path, index=False)
+    conn.commit()
+    conn.close()
 
     return redirect(url_for('form', success=1))
 
@@ -86,20 +97,25 @@ def update_out_time():
     shift_date = request.form['shift_date']
     out_time = request.form['out_time']
 
-    if os.path.exists(file_path):
-        df = pd.read_excel(file_path, dtype=str)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-        match = df[
-            (df["Employee Name"] == name) &
-            (df["Shift Date"] == shift_date) &
-            ((df["Out Time"].isna()) | (df["Out Time"] == ""))
-        ]
+    cursor.execute("""
+        SELECT id FROM attendance
+        WHERE employee_name=? AND shift_date=? AND (out_time IS NULL OR out_time='')
+    """, (name, shift_date))
 
-        if not match.empty:
-            index = match.index[0]
-            df.at[index, "Out Time"] = out_time
+    match = cursor.fetchone()
 
-        df.to_excel(file_path, index=False)
+    if match:
+        cursor.execute("""
+            UPDATE attendance
+            SET out_time=?
+            WHERE id=?
+        """, (out_time, match[0]))
+
+    conn.commit()
+    conn.close()
 
     return redirect(url_for('form', success=1))
 
